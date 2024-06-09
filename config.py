@@ -168,11 +168,6 @@ available_setting = {
     "zhipu_ai_api_base": "https://open.bigmodel.cn/api/paas/v4",
     "moonshot_api_key": "",
     "moonshot_base_url":"https://api.moonshot.cn/v1/chat/completions",
-    # LinkAI平台配置
-    "use_linkai": False,
-    "linkai_api_key": "",
-    "linkai_app_code": "",
-    "linkai_api_base": "https://api.link-ai.tech",  # linkAI服务地址
 }
 
 
