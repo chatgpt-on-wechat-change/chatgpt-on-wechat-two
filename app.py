@@ -106,7 +106,15 @@ def main():
         if channel_name in ["wx", "wxy", "terminal", "wechatmp", "wechatmp_service", "wechatcom_app", "wework",
                             const.FEISHU, const.DINGTALK]:
             PluginManager().load_plugins()
-            
+
+        if conf().get("use_linkai"):
+            try:
+                from common import linkai_client
+                threading.Thread(target=linkai_client.start, args=(channel,)).start()
+            except Exception as e:
+                pass
+        
+        threading.Thread(target=start_server).start()
         channel.startup()
         
     except Exception as e:
