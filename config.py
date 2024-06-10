@@ -186,11 +186,6 @@ class Config(dict):
             raise Exception("key {} not in available_setting".format(key))
         return super().__getitem__(key)
 
-    def __setitem__(self, key, value):
-        if key not in available_setting:
-            raise Exception("key {} not in available_setting".format(key))
-        return super().__setitem__(key, value)
-
     def get(self, key, default=None):
         try:
             return self[key]
