@@ -204,6 +204,18 @@ class WechatChannel(ChatChannel):
         # Log the message
         with open(log_file_path, "a", encoding="utf-8") as log_file:
             log_file.write(f"[{timestamp}] {sender_name}: {msg_content}\n")
+            
+    def search_friends(self, name: str):
+        """
+        Search friends
+        """
+        return itchat.search_friends(name=name)
+    
+    def search_chatrooms(self, name: str):
+        """
+        Search chatrooms
+        """
+        return itchat.search_chatrooms(name=name)
 
     def send(self, reply: Reply, context: Context):
         receiver = context["receiver"]

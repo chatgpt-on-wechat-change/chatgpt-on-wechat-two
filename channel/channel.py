@@ -16,6 +16,18 @@ class Channel(object):
         init channel
         """
         raise NotImplementedError
+    
+    def search_friends(self):
+        """
+        Search friends
+        """
+        raise NotImplementedError
+    
+    def search_chatrooms(self):
+        """
+        Search chatrooms
+        """
+        raise NotImplementedError
 
     def handle_text(self, msg):
         """

@@ -330,33 +330,46 @@ class Godcmd(Plugin):
                     else:
                         ok, result = False, "当前对话机器人不支持重置会话"
                 elif cmd == "push_sub":
-                    filename = 'push_sub_groups.json'
+                    filename = 'push_sub_data.json'
                     if not os.path.exists(filename):
                         with open(filename, 'w', encoding='utf-8') as f:
                             json.dump({}, f, ensure_ascii=False, indent=4)
                     with open(filename, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     msg = e_context["context"]["msg"]
-                    user_id = msg.other_user_id
                     nickname = msg.other_user_nickname
-                    data[user_id] = {
-                        "enable": True,
-                        "nickname": nickname
-                    }
+                    if isgroup:
+                        if data.get('rooms') is None:
+                            data["rooms"] = []
+                        if (nickname in data["rooms"]) is False:
+                            data["rooms"].append(nickname)
+                    else:
+                        if data.get('friends') is None:
+                            data["friends"] = []
+                        if (nickname in data["friends"]) is False:
+                            data["friends"].append(nickname)
                     with open(filename, 'w', encoding='utf-8') as file:
                         json.dump(data, file, ensure_ascii=False, indent=4)
                     ok, result = True, "推送订阅成功！"
                 elif cmd == "push_unsub":
-                    filename = 'push_sub_groups.json'
+                    filename = 'push_sub_data.json'
                     if not os.path.exists(filename):
                         with open(filename, 'w', encoding='utf-8') as f:
                             json.dump({}, f, ensure_ascii=False, indent=4)
                     with open(filename, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     msg = e_context["context"]["msg"]
-                    user_id = msg.other_user_id
-                    if data[user_id] is not None:
-                        data[user_id]["enable"] = False
+                    nickname = msg.other_user_nickname
+                    if isgroup:
+                        if data.get('rooms') is None:
+                            data["rooms"] = []
+                        if nickname in data["rooms"]:
+                            data["rooms"].remove(nickname)
+                    else:
+                        if data.get('friends') is None:
+                            data["friends"] = []
+                        if nickname in data["friends"]:
+                            data["friends"].remove(nickname)
                     with open(filename, 'w', encoding='utf-8') as file:
                         json.dump(data, file, ensure_ascii=False, indent=4)
                     ok, result = True, "取消推送订阅成功！"
