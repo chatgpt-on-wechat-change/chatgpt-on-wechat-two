@@ -36,7 +36,7 @@ class PublishParams(BaseModel):
     content: str
 @app.post('/publish')
 async def publish(params: PublishParams):
-    filename = 'push_sub_data.json'
+    filename = 'push_sub_groups.json'
     if not os.path.exists(filename):
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
@@ -45,37 +45,20 @@ async def publish(params: PublishParams):
     success = []
     failed = []
     ignore = []
-    for name in (data.get("rooms") or []):
-        rooms = channel.search_chatrooms(name)
-        if len(rooms) == 0:
+    for user_id in data: 
+        if data[user_id].get("enable") is not True:
+            ignore.append(data[user_id].get("nickname"))
             continue
-        user_name = rooms[0]["UserName"]
         try:
             channel.send(reply=Reply(
                 type=ReplyType.TEXT,
                 content=params.content
             ), context={
-                'receiver': user_name
+                'receiver': user_id
             })
-            success.append(name)
+            success.append(data[user_id].get("nickname"))
         except Exception as e:
-            failed.append(name)
-            logger.exception(e)
-    for name in (data.get("friends") or []):
-        friends = channel.search_friends(name)
-        if len(friends) == 0:
-            continue
-        user_name = friends[0]["UserName"]
-        try:
-            channel.send(reply=Reply(
-                type=ReplyType.TEXT,
-                content=params.content
-            ), context={
-                'receiver': user_name
-            })
-            success.append(name)
-        except Exception as e:
-            failed.append(name)
+            failed.append(data[user_id].get("nickname"))
             logger.exception(e)
     return JSONResponse({
         "status": 0,
