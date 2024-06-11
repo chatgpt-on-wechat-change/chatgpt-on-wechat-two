@@ -1,3 +1,9 @@
+# encoding:utf-8
+
+"""
+wechat channel
+"""
+
 import io
 import json
 import os
@@ -61,7 +67,11 @@ def _check(func):
     return wrapper
 
 
+# 可用的二维码生成接口
+# https://api.qrserver.com/v1/create-qr-code/?size=400×400&data=https://www.abc.com
+# https://api.isoyu.com/qr/?m=1&e=L&p=20&url=https://www.abc.com
 def qrCallback(uuid, status, qrcode):
+    # logger.debug("qrCallback: {} {}".format(uuid,status))
     if status == "0":
         try:
             from PIL import Image
@@ -101,7 +111,6 @@ class WechatChannel(ChatChannel):
         super().__init__()
         self.receivedMsgs = ExpiredDict(conf().get("expires_in_seconds"))
         self.auto_login_times = 0
-        self.root_path = os.path.dirname(os.path.abspath(__file__))  # 获取项目根路径
 
     def startup(self):
         try:
@@ -142,9 +151,21 @@ class WechatChannel(ChatChannel):
         logger.debug("Login success")
         _send_login_success()
 
+    # handle_* 系列函数处理收到的消息后构造Context，然后传入produce函数中处理Context和发送回复
+    # Context包含了消息的所有信息，包括以下属性
+    #   type 消息类型, 包括TEXT、VOICE、IMAGE_CREATE
+    #   content 消息内容，如果是TEXT类型，content就是文本内容，如果是VOICE类型，content就是语音文件名，如果是IMAGE_CREATE类型，content就是图片生成命令
+    #   kwargs 附加参数字典，包含以下的key：
+    #        session_id: 会话id
+    #        isgroup: 是否是群聊
+    #        receiver: 需要回复的对象
+    #        msg: ChatMessage消息对象
+    #        origin_ctype: 原始消息类型，语音转文字后，私聊时如果匹配前缀失败，会根据初始消息是否是语音来放宽触发规则
+    #        desire_rtype: 希望回复类型，默认是文本回复，设置为ReplyType.VOICE是语音回复
     @time_checker
     @_check
     def handle_single(self, cmsg: ChatMessage):
+        # filter system message
         if cmsg.other_user_id in ["weixin"]:
             return
         if cmsg.ctype == ContextType.VOICE:
@@ -175,48 +196,17 @@ class WechatChannel(ChatChannel):
         elif cmsg.ctype in [ContextType.JOIN_GROUP, ContextType.PATPAT, ContextType.ACCEPT_FRIEND, ContextType.EXIT_GROUP]:
             logger.debug("[WX]receive note msg: {}".format(cmsg.content))
         elif cmsg.ctype == ContextType.TEXT:
+            # logger.debug("[WX]receive group msg: {}, cmsg={}".format(json.dumps(cmsg._rawmsg, ensure_ascii=False), cmsg))
             pass
         elif cmsg.ctype == ContextType.FILE:
             logger.debug(f"[WX]receive attachment msg, file_name={cmsg.content}")
         else:
             logger.debug("[WX]receive group msg: {}".format(cmsg.content))
-
-        # Log group chat message
-        self.log_group_message(cmsg)
-
         context = self._compose_context(cmsg.ctype, cmsg.content, isgroup=True, msg=cmsg)
         if context:
             self.produce(context)
 
-    def log_group_message(self, cmsg: ChatMessage):
-        group_name = cmsg.chatroom_name
-        msg_content = cmsg.content
-        sender_name = cmsg.sender_name
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(cmsg.create_time))
-
-        # Create the directory for the group if it doesn't exist
-        group_dir = os.path.join(self.root_path, group_name)
-        os.makedirs(group_dir, exist_ok=True)
-
-        # Create the log file with the current date
-        log_file_path = os.path.join(group_dir, f"{time.strftime('%Y-%m-%d')}.txt")
-
-        # Log the message
-        with open(log_file_path, "a", encoding="utf-8") as log_file:
-            log_file.write(f"[{timestamp}] {sender_name}: {msg_content}\n")
-            
-    def search_friends(self, name: str):
-        """
-        Search friends
-        """
-        return itchat.search_friends(name=name)
-    
-    def search_chatrooms(self, name: str):
-        """
-        Search chatrooms
-        """
-        return itchat.search_chatrooms(name=name)
-
+    # 统一的发送函数，每个Channel自行实现，根据reply的type字段发送不同类型的消息
     def send(self, reply: Reply, context: Context):
         receiver = context["receiver"]
         if reply.type == ReplyType.TEXT:
@@ -228,7 +218,7 @@ class WechatChannel(ChatChannel):
         elif reply.type == ReplyType.VOICE:
             itchat.send_file(reply.content, toUserName=receiver)
             logger.info("[WX] sendFile={}, receiver={}".format(reply.content, receiver))
-        elif reply.type == ReplyType.IMAGE_URL:
+        elif reply.type == ReplyType.IMAGE_URL:  # 从网络下载图片
             img_url = reply.content
             logger.debug(f"[WX] start download image, img_url={img_url}")
             pic_res = requests.get(img_url, stream=True)
@@ -241,20 +231,20 @@ class WechatChannel(ChatChannel):
             image_storage.seek(0)
             itchat.send_image(image_storage, toUserName=receiver)
             logger.info("[WX] sendImage url={}, receiver={}".format(img_url, receiver))
-        elif reply.type == ReplyType.IMAGE:
+        elif reply.type == ReplyType.IMAGE:  # 从文件读取图片
             image_storage = reply.content
             image_storage.seek(0)
             itchat.send_image(image_storage, toUserName=receiver)
             logger.info("[WX] sendImage, receiver={}".format(receiver))
-        elif reply.type == ReplyType.FILE:
+        elif reply.type == ReplyType.FILE:  # 新增文件回复类型
             file_storage = reply.content
             itchat.send_file(file_storage, toUserName=receiver)
             logger.info("[WX] sendFile, receiver={}".format(receiver))
-        elif reply.type == ReplyType.VIDEO:
+        elif reply.type == ReplyType.VIDEO:  # 新增视频回复类型
             video_storage = reply.content
             itchat.send_video(video_storage, toUserName=receiver)
             logger.info("[WX] sendFile, receiver={}".format(receiver))
-        elif reply.type == ReplyType.VIDEO_URL:
+        elif reply.type == ReplyType.VIDEO_URL:  # 新增视频URL回复类型
             video_url = reply.content
             logger.debug(f"[WX] start download video, video_url={video_url}")
             video_res = requests.get(video_url, stream=True)
@@ -268,7 +258,6 @@ class WechatChannel(ChatChannel):
             itchat.send_video(video_storage, toUserName=receiver)
             logger.info("[WX] sendVideo url={}, receiver={}".format(video_url, receiver))
 
-
 def _send_login_success():
     try:
         from common.linkai_client import chat_client
@@ -277,7 +266,6 @@ def _send_login_success():
     except Exception as e:
         pass
 
-
 def _send_logout():
     try:
         from common.linkai_client import chat_client
@@ -285,7 +273,6 @@ def _send_logout():
             chat_client.send_logout()
     except Exception as e:
         pass
-
 
 def _send_qr_code(qrcode_list: list):
     try:
